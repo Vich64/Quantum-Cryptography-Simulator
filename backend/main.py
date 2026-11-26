@@ -30,6 +30,7 @@ class RunRequest(BaseModel):
     eve_on: bool = False
     eve_percent: int = Field(100, ge=0, le=100, description="Share of photons Eve reads, when eve_on")
     check_percent: int = Field(25, ge=10, le=50, description="Share of kept bits revealed for the error check")
+    noise_percent: float = Field(0, ge=0, le=25, description="Chance (%) that channel noise flips Bob's result")
     seed: int | None = Field(None, ge=0, lt=2**31 - 1)
     preset: Literal["slide12"] | None = None
     # Optional fixed choices (used by the game, where the player picks Bob's glasses).
@@ -72,14 +73,25 @@ def run(req: RunRequest):
             n = lengths.pop()
             kwargs = fixed
     try:
-        return bb84.run_bb84(n, eve_fraction=eve_fraction, check_fraction=req.check_percent / 100, seed=req.seed, **kwargs)
+        return bb84.run_bb84(
+            n,
+            eve_fraction=eve_fraction,
+            check_fraction=req.check_percent / 100,
+            noise_fraction=req.noise_percent / 100,
+            seed=req.seed,
+            **kwargs,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/sweep")
-def sweep(n_photons: int = Query(400, ge=50, le=1000), seed: int | None = Query(None, ge=0, lt=2**31 - 100)):
-    return bb84.run_sweep(n_photons=n_photons, seed=seed)
+def sweep(
+    n_photons: int = Query(400, ge=50, le=1000),
+    seed: int | None = Query(None, ge=0, lt=2**31 - 100),
+    noise_percent: float = Query(0, ge=0, le=25),
+):
+    return bb84.run_sweep(n_photons=n_photons, seed=seed, noise_fraction=noise_percent / 100)
 
 
 @app.get("/api/measure")

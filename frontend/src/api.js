@@ -21,7 +21,7 @@ async function request(path, options) {
 
 export const runBB84 = (body) =>
   request('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-export const runSweep = (n = 800) => request(`/api/sweep?n_photons=${n}`)
+export const runSweep = (n = 800, noisePercent = 0) => request(`/api/sweep?n_photons=${n}&noise_percent=${noisePercent}`)
 export const getCircuit = (params) => request('/api/circuit?' + new URLSearchParams(params))
 export const getHealth = () => request('/api/health')
 export const measureOnce = (bit, aliceFilter, bobFilter) =>
