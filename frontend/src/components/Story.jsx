@@ -1,4 +1,5 @@
 import { Avatar, Bubble, Glasses } from './Characters.jsx'
+import { Icon } from './Icons.jsx'
 import { Photon } from './Photon.jsx'
 
 const PAGES = [
@@ -33,7 +34,7 @@ const PAGES = [
 ]
 export const STORY_PAGES = PAGES.length
 
-const Arrow = () => <span className="text-[22px] text-[#B5BABE] px-1">→</span>
+const Arrow = () => <Icon name="arrow" size={22} className="text-[var(--ink-soft)] mx-1" />
 
 function Scene({ page }) {
   switch (page) {
@@ -42,7 +43,7 @@ function Scene({ page }) {
         <div className="text-center">
           <div className="flex items-center justify-center gap-6 mt-2">
             <div><Avatar who="alice" size={84} /><div className="font-bold">Alice</div></div>
-            <div className="text-[34px] text-[var(--cyan)]">⇄</div>
+            <Icon name="swap" size={34} className="text-[var(--ink-strong)]" />
             <div><Avatar who="bob" size={84} /><div className="font-bold">Bob</div></div>
           </div>
           <div className="mt-5"><div className="text-[12px] muted mb-1">a secret key looks like this:</div><span className="keybox">01101</span></div>
@@ -69,7 +70,7 @@ function Scene({ page }) {
         <div className="text-center">
           <div className="flex justify-center gap-5 mt-4">
             {[['+', 0], ['+', 1], ['x', 0], ['x', 1]].map(([f, b]) => (
-              <div key={f + b} className="panel px-4 py-3"><Photon filter={f} bit={b} size={54} color="#0284C7" width={5} /></div>
+              <div key={f + b} className="panel px-4 py-3"><Photon filter={f} bit={b} size={54} color="#16133A" width={5} /></div>
             ))}
           </div>
           <p className="mt-5 text-[13px] max-w-sm mx-auto">Up-and-down, side-to-side, or slanted one of two ways: <b>which way it points</b> tells you the number.</p>
@@ -95,12 +96,12 @@ function Scene({ page }) {
           <div className="panel p-3 flex items-center gap-2 flex-wrap">
             <span className="text-[12px] w-full font-bold text-[var(--good)]">Same glasses</span>
             <Photon filter="+" bit={0} size={34} width={3.5} /><Arrow /><Glasses filter="+" size={46} /><Arrow />
-            <span className="text-[15px]">Bob reads <b className="text-[20px]">0</b> every time ✓</span>
+            <span className="text-[15px]">Bob reads <b className="text-[20px]">0</b> every time <Icon name="check" size={18} className="text-[var(--good)]" /></span>
           </div>
           <div className="panel p-3 flex items-center gap-2 flex-wrap">
             <span className="text-[12px] w-full font-bold text-[var(--bad)]">Different glasses</span>
             <Photon filter="+" bit={0} size={34} width={3.5} /><Arrow /><Glasses filter="x" size={46} /><Arrow />
-            <span className="text-[15px]">Bob gets <b className="text-[20px]">0 or 1</b>: a coin flip 🪙</span>
+            <span className="text-[15px]">Bob gets <b className="text-[20px]">0 or 1</b>: a coin flip <Icon name="coin" size={18} className="text-[var(--check)]" /></span>
           </div>
         </div>
       )
@@ -112,7 +113,7 @@ function Scene({ page }) {
             <Arrow />
             <div className="text-center"><Avatar who="eve" size={46} /><div><Glasses filter="x" size={40} label={false} /></div><div className="text-[11px] text-[var(--bad)]">wrong guess!</div></div>
             <Arrow />
-            <div className="text-center"><div className="h-[46px] flex items-center justify-center"><Photon filter="x" bit={0} size={34} color="#E0463A" width={3.5} /></div><div className="text-[11px] text-[var(--bad)]">stick is bent</div></div>
+            <div className="text-center"><div className="h-[46px] flex items-center justify-center"><Photon filter="x" bit={0} size={34} color="#E0344B" width={3.5} /></div><div className="text-[11px] text-[var(--bad)]">stick is bent</div></div>
             <Arrow />
             <div className="text-center"><Avatar who="bob" size={46} /><div><Glasses filter="+" size={40} label={false} /></div><div className="text-[11px]">reads 0 or 1</div></div>
           </div>
@@ -132,7 +133,7 @@ function Scene({ page }) {
                 ['light stick', 'photon (its polarization)'],
                 ['magic glasses', 'filter or basis: + (straight) or × (diagonal)'],
                 ['number', 'bit (0 or 1)'],
-                ['mistakes', 'error rate (QBER). Above 11% means a spy'],
+                ['mistakes', 'error rate (QBER). Above 11%: throw the key away (spy or noise). Below 11%: carry on, then shrink the key (privacy amplification)'],
               ].map(([k, v]) => (
                 <tr key={k} className="border-t border-[var(--line)]"><td className="py-1 font-bold text-[var(--ink-strong)] w-[36%]">{k}</td><td>{v}</td></tr>
               ))}
@@ -145,7 +146,7 @@ function Scene({ page }) {
               {[
                 ['Safe because…', 'a maths puzzle is hard', 'the laws of physics'],
                 ['A spy copies the key', 'nobody notices', 'the photons change, so they notice'],
-                ['Quantum computers', 'might break it', 'still safe'],
+                ['Quantum computers', "can break it: Shor's algorithm factors the big numbers fast", 'still safe: no maths puzzle to solve'],
               ].map(([k, a, b]) => (
                 <tr key={k} className="border-t border-[var(--line)]"><td className="py-1 font-bold text-[var(--ink-strong)]">{k}</td><td>{a}</td><td>{b}</td></tr>
               ))}
@@ -173,14 +174,14 @@ export function StoryLeft({ page, setPage, onStart }) {
       <div className="flex gap-1.5 mt-1" aria-label="Story pages">
         {PAGES.map((x, i) => (
           <button key={i} aria-label={`Page ${i + 1}: ${x.title}`} onClick={() => setPage(i)}
-            className="h-2.5 flex-1 rounded-full border-0 p-0" style={{ background: i === page ? '#0369A1' : i < page ? '#7DD3FC' : '#E2E8F0' }} />
+            className="h-2.5 flex-1 rounded-full border-0 p-0" style={{ background: i === page ? 'var(--ink-strong)' : i < page ? 'var(--photon)' : '#fff', border: '2px solid var(--ink-strong)' }} />
         ))}
       </div>
       <div className="mt-auto flex flex-wrap items-center gap-3 pt-2">
         {last
           ? <button className="pill" onClick={onStart}>Start <span className="hl">Mission 1</span>!</button>
-          : <button className="pill" onClick={() => setPage(page + 1)}>Next <span className="hl">page</span> ›</button>}
-        {page > 0 && <button className="btn-ghost-dark" onClick={() => setPage(page - 1)}>‹ Back</button>}
+          : <button className="pill" onClick={() => setPage(page + 1)}>Next <span className="hl">page</span> <Icon name="right" size={18} strokeWidth={2.6} /></button>}
+        {page > 0 && <button className="btn-ghost-dark" onClick={() => setPage(page - 1)}><Icon name="left" size={18} strokeWidth={2.6} /> Back</button>}
         {!last && <button className="btn-ghost-dark" onClick={onStart}>Skip to the game</button>}
       </div>
     </>

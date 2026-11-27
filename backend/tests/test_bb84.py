@@ -84,3 +84,57 @@ def test_api_circuit():
     r = client.get("/api/circuit", params={"alice_bit": 1, "alice_filter": "x", "bob_filter": "+", "eve_filter": "x"})
     assert r.status_code == 200
     assert "H" in r.json()["circuit"]
+
+
+# ---- Teacher feedback (19 Nov): noise, Eve estimate, spy map ----
+
+
+def test_noise_zero_gives_no_errors_without_eve():
+    for seed in range(10):
+        r = bb84.run_bb84(256, noise_fraction=0.0, seed=seed)
+        assert r["kept_errors"] == 0
+        assert not any(p["noise_flip"] for p in r["photons"])
+
+
+def test_noise_p_gives_about_p_errors():
+    r = bb84.run_bb84(4000, noise_fraction=0.05, seed=21)
+    assert 0.035 <= r["actual_qber"] <= 0.065
+    # without Eve every mistake comes from noise
+    assert all(p["noise_flip"] for p in r["photons"] if p["error"])
+    assert r["estimated_eve_fraction"] > 0  # noise looks like Eve to Alice and Bob
+
+
+def test_estimated_eve_fraction_tracks_truth():
+    for f, seed in [(0.0, 4), (0.4, 5), (1.0, 6)]:
+        r = bb84.run_bb84(4000, eve_fraction=f, check_fraction=0.5, seed=seed)
+        assert abs(r["estimated_eve_fraction"] - f) <= 0.12
+        lo, hi = r["estimated_eve_range"]
+        assert lo <= r["estimated_eve_fraction"] <= hi
+
+
+def test_eve_caught_flags_and_known_key_bits():
+    r = bb84.run_bb84(2000, eve_fraction=0.4, seed=8)
+    for p in r["photons"]:
+        assert p["eve_caught"] == (p["eve_read"] and p["error"])
+    touched = [p for p in r["photons"] if p["eve_read"] and p["same_filter"]]
+    caught = [p for p in touched if p["eve_caught"]]
+    assert 0.17 <= len(caught) / len(touched) <= 0.33  # about 1 in 4 touched photons shows a mistake
+    known = sum(p["eve_read"] and p["in_key"] and p["eve_bit"] == p["alice_bit"] for p in r["photons"])
+    assert r["eve_known_key_bits"] == known > 0
+    assert r["eve_sure_key_bits"] <= r["eve_known_key_bits"] <= r["eve_key_bits_read"]
+
+
+def test_clever_eve_stays_under_the_limit():
+    # reading ~40% gives ~10% errors, just under the 11% line, yet Eve learns many key bits
+    r = bb84.run_bb84(4000, eve_fraction=0.4, check_fraction=0.5, seed=9)
+    assert r["status"] == "accepted"
+    assert r["eve_known_key_bits"] > 0.25 * len(r["alice_key"])
+
+
+def test_api_noise_and_sweep():
+    r = client.post("/api/run", json={"n_photons": 64, "noise_percent": 10, "seed": 3})
+    assert r.status_code == 200
+    assert r.json()["noise_fraction"] == 0.1
+    assert client.post("/api/run", json={"n_photons": 64, "noise_percent": 60}).status_code == 422
+    s = client.get("/api/sweep", params={"n_photons": 100, "noise_percent": 5, "seed": 1}).json()
+    assert abs(s["points"][0]["theory"] - 0.05) < 1e-9

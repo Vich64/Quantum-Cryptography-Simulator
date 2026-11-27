@@ -1,3 +1,4 @@
+import { Icon } from './Icons.jsx'
 import { useState } from 'react'
 import { measureOnce, runBB84 } from '../api.js'
 import { byteHex, lockMessage, toBytes } from '../otp.js'
@@ -18,19 +19,10 @@ const starsFor = (mistakes) => (mistakes === 0 ? 3 : mistakes === 1 ? 2 : 1)
 
 /* ---------------- shared bits ---------------- */
 
-function MissionHead({ index, stars, unlocked, setMission }) {
+// Picking a mission happens in the Learn path above the stage.
+function MissionHead({ index }) {
   return (
     <div>
-      <div className="flex flex-wrap gap-1.5 mb-3" role="tablist" aria-label="Missions">
-        {MISSIONS.map((m, i) => (
-          <button key={m.id} role="tab" aria-selected={i === index} disabled={!unlocked(i)} onClick={() => setMission(i)}
-            title={unlocked(i) ? m.title : 'Finish the mission before to unlock'}
-            className={`chip border-2 ${i === index ? 'bg-[var(--primary)] border-[var(--primary)] text-white' : 'bg-white border-[var(--line)] text-[var(--ink)]'}`}>
-            {unlocked(i) ? `Mission ${i + 1}` : `🔒 ${i + 1}`}
-            {unlocked(i) && <Stars n={stars[m.id] || 0} size={11} />}
-          </button>
-        ))}
-      </div>
       <div className="text-[12px] text-[var(--ink-soft)]">Mission {index + 1} of {MISSIONS.length}</div>
       <h2>{MISSIONS[index].title}</h2>
     </div>
@@ -49,9 +41,20 @@ function MissionTablet({ index, best, total, status }) {
 function DoneButtons({ onNext, onReplay, nextLabel }) {
   return (
     <>
-      {onNext && <button className="pill" onClick={onNext}>{nextLabel || <>Next <span className="hl">mission</span> ›</>}</button>}
+      {onNext && <button className="pill" onClick={onNext}>{nextLabel || <>Next <span className="hl">mission</span> <Icon name="right" size={18} strokeWidth={2.6} /></>}</button>}
       <button className="btn-ghost-dark" onClick={onReplay}>Play again</button>
     </>
+  )
+}
+
+/** End-of-mission link into the free-play Lab. */
+function TryLab({ text, onClick }) {
+  return (
+    <div className="trylab">
+      <span className="tile-ico photon"><Icon name="flask" size={22} /></span>
+      <span className="flex-1">{text}</span>
+      <button className="btn-ghost-dark" onClick={onClick}>Try it in the Lab <Icon name="right" size={18} strokeWidth={2.6} /></button>
+    </div>
   )
 }
 
@@ -60,7 +63,7 @@ function CheatSheet({ small }) {
   return (
     <div className={`grid grid-cols-2 gap-2 ${small ? '' : 'max-w-md mx-auto'}`}>
       {['+', 'x'].map((f) => (
-        <div key={f} className={small ? 'rounded-xl bg-[#F8FAFC] border border-[var(--line)] px-3 py-2' : 'panel p-3 text-center'}>
+        <div key={f} className={small ? 'rounded-lg bg-[var(--tint)] border-2 border-[var(--line)] px-3 py-2' : 'panel p-3 text-center'}>
           <Glasses filter={f} size={small ? 34 : 56} label={!small} />
           {[0, 1].map((b) => (
             <div key={b} className={`flex items-center gap-1.5 ${small ? 'text-[12px]' : 'justify-center text-[15px] mt-1'}`}>
@@ -124,12 +127,12 @@ function Mission1({ head, tablet, onDone, onNext, onReplay }) {
     left = (<>
       <Bubble who="bob">Help me read Alice's sticks! Which <b>number</b> is this one? Peek at the cheat sheet if you forget.</Bubble>
       <CheatSheet small />
-      <div className="mt-auto pt-2">{ans != null && <button className="pill" onClick={nextRound}>{r === rounds.length - 1 ? <>Next <span className="hl">challenge</span> ›</> : <>Next <span className="hl">stick</span> ›</>}</button>}</div>
+      <div className="mt-auto pt-2">{ans != null && <button className="pill" onClick={nextRound}>{r === rounds.length - 1 ? <>Next <span className="hl">challenge</span> <Icon name="right" size={18} strokeWidth={2.6} /></> : <>Next <span className="hl">stick</span> <Icon name="right" size={18} strokeWidth={2.6} /></>}</button>}</div>
     </>)
     screen = (
       <div className="screen-pad text-center" key={r}>
         <div className="muted text-[12px]">Stick {r + 1} of 6</div>
-        <div className="pop my-2 inline-block panel px-8 py-4"><Photon filter={f} bit={b} size={80} width={6} color="#0284C7" /></div>
+        <div className="pop my-2 inline-block panel px-8 py-4"><Photon filter={f} bit={b} size={80} width={6} color="#16133A" /></div>
         <div className="text-[13px]">Bob reads it with the right glasses: <Glasses filter={f} size={44} label={false} /></div>
         <div className="flex justify-center gap-4 mt-3">
           {[0, 1].map((v) => (
@@ -188,7 +191,7 @@ function Mission1({ head, tablet, onDone, onNext, onReplay }) {
 
 const N2 = 8
 
-function Mission2({ head, tablet, onDone, onNext, onReplay }) {
+function Mission2({ head, tablet, onDone, onNext, onReplay, onLab }) {
   const [alice] = useState(() => ({ bits: Array.from({ length: N2 }, coin), filters: Array.from({ length: N2 }, randFilter) }))
   const [phase, setPhase] = useState('intro')
   const [picks, setPicks] = useState([])
@@ -237,7 +240,7 @@ function Mission2({ head, tablet, onDone, onNext, onReplay }) {
         <tr><th>Bob's glasses</th>{P.map((p, i) => <td key={i} className={phase !== 'compare' && showAlice ? cellCls(i) : ''}><GlassTag filter={p.bob_filter} /></td>)}</tr>
         <tr><th>Bob saw</th>{P.map((p, i) => <td key={i} className={phase !== 'compare' && showAlice ? cellCls(i) : ''}><Photon filter={p.bob_filter} bit={p.bob_bit} size={20} /></td>)}</tr>
         <tr><th>Bob's number</th>{P.map((p, i) => <td key={i} className={phase !== 'compare' && showAlice ? cellCls(i) : ''}>{p.bob_bit}</td>)}</tr>
-        {phase === 'compare' && <tr><th>Same glasses?</th>{P.map((p, i) => <td key={i} className={cellCls(i)} onClick={() => toggle(i)}>{checked ? (same[i] ? '✓' : '✗') : tapped.has(i) ? '✓' : ''}</td>)}</tr>}
+        {phase === 'compare' && <tr><th>Same glasses?</th>{P.map((p, i) => <td key={i} className={cellCls(i)} onClick={() => toggle(i)}>{checked ? <Icon name={same[i] ? 'check' : 'x'} size={18} /> : tapped.has(i) ? <Icon name="check" size={18} /> : ''}</td>)}</tr>}
         {(phase === 'key' || phase === 'done') && <tr className="pop"><th>Alice's number</th>{P.map((p, i) => <td key={i} className={cellCls(i)}>{p.alice_bit}</td>)}</tr>}
       </tbody>
     </table>
@@ -288,7 +291,7 @@ function Mission2({ head, tablet, onDone, onNext, onReplay }) {
     status = 'Bob wrote down 8 numbers'
     left = (<>
       <Bubble who="bob">I looked at every photon and wrote down a number. But some of them are just <b>coin-flip guesses</b>, from when I wore the wrong glasses. Which ones? I can't tell yet!</Bubble>
-      <div className="mt-auto pt-2"><button className="pill" onClick={() => setPhase('compare')}>Call <span className="hl">Alice</span> ›</button></div>
+      <div className="mt-auto pt-2"><button className="pill" onClick={() => setPhase('compare')}>Call <span className="hl">Alice</span> <Icon name="right" size={18} strokeWidth={2.6} /></button></div>
     </>)
     screen = <div className="screen-pad pop"><h3 className="text-center">What Bob saw</h3>{table}</div>
   } else if (phase === 'compare') {
@@ -297,13 +300,13 @@ function Mission2({ head, tablet, onDone, onNext, onReplay }) {
       <Bubble who="alice">I'll tell Bob which <b>glasses</b> I used, out loud. That's safe: glasses don't give away the numbers!</Bubble>
       <div className={`note ${checked && mistakes === 0 ? 'good' : 'info'}`}>
         {checked
-          ? mistakes === 0 ? '🎉 Perfect! You found every match.' : <><b className="text-[var(--good)]">Green</b> = right. <b className="text-[var(--check)]">Orange</b> = a match you missed. <b className="text-[var(--bad)]">Red</b> = the glasses were different.</>
+          ? mistakes === 0 ? <><Icon name="sparkle" size={18} className="text-[var(--check)]" /> Perfect! You found every match.</> : <><b className="text-[var(--good)]">Green</b> = right. <b className="text-[var(--check)]">Orange</b> = a match you missed. <b className="text-[var(--bad)]">Red</b> = the glasses were different.</>
           : <><b>Your job:</b> tap every photon where Alice and Bob wore the <b>same</b> glasses.</>}
       </div>
       <div className="mt-auto pt-2">
         {!checked
           ? <button className="pill" onClick={check}>Check my <span className="hl">answers</span></button>
-          : <button className="pill" onClick={() => setPhase('key')}>Keep the <span className="hl">matches</span> ›</button>}
+          : <button className="pill" onClick={() => setPhase('key')}>Keep the <span className="hl">matches</span> <Icon name="right" size={18} strokeWidth={2.6} /></button>}
       </div>
     </>)
     screen = <div className="screen-pad"><h3 className="text-center">Tap the photons with matching glasses</h3>{table}</div>
@@ -321,7 +324,10 @@ function Mission2({ head, tablet, onDone, onNext, onReplay }) {
     </>)
     screen = (<div className="screen-pad">
       {done
-        ? <Celebrate stars={stars} title="Key maker">You and Bob made the secret key <span className="keybox text-[15px]">{key.map((p) => p.bob_bit).join('')}</span>. Photons kept: {key.length} of 8. That's about half, just like in real BB84!</Celebrate>
+        ? <>
+          <Celebrate stars={stars} title="Key maker">You and Bob made the secret key <span className="keybox text-[15px]">{key.map((p) => p.bob_bit).join('')}</span>. Photons kept: {key.length} of 8. That's about half, just like in real BB84!</Celebrate>
+          <TryLab text={<>Make a much longer key in the <b>Photon Lab</b>, with up to 256 photons.</>} onClick={() => onLab('simulator')} />
+        </>
         : <>{table}<div className="text-center mt-3 pop"><div className="text-[12px] muted mb-1">Your secret key</div><span className="keybox">{key.map((p) => p.bob_bit).join('') || '—'}</span></div></>}
     </div>)
   }
@@ -333,7 +339,7 @@ function Mission2({ head, tablet, onDone, onNext, onReplay }) {
 const CASES = 3
 const N3 = 96
 
-function Mission3({ head, tablet, onDone, onNext, onReplay }) {
+function Mission3({ head, tablet, onDone, onNext, onReplay, onLab }) {
   const [plan] = useState(() => [true, false, Math.random() < 0.5].sort(() => Math.random() - 0.5))
   const [round, setRound] = useState(0)
   const [phase, setPhase] = useState('send') // send, compare, reveal, done
@@ -372,7 +378,7 @@ function Mission3({ head, tablet, onDone, onNext, onReplay }) {
     } else { setRound(round + 1); setRun(null); setPhase('send') }
   }
 
-  const rule = <div className="note warn">🔎 <b>Detective rule:</b> if more than <b>1 in every 10</b> checked numbers are different, a spy was listening.</div>
+  const rule = <div className="note warn"><Icon name="search" size={18} /> <b>Detective rule:</b> if more than <b>1 in every 10</b> checked numbers are different, a spy was listening.</div>
 
   let left, screen
   const status = phase === 'done' ? 'Done!' : `Case ${round + 1} of ${CASES} · ${right} solved`
@@ -387,7 +393,7 @@ function Mission3({ head, tablet, onDone, onNext, onReplay }) {
       <div className="muted text-[12px]">Case {round + 1} of {CASES}</div>
       <div className="flex items-center gap-3 mt-8 px-4">
         <Avatar who="alice" size={64} />
-        <div className="channel">{busy && <span className="fly" />}<div className="absolute left-1/2 -translate-x-1/2 -top-12 text-[40px]" aria-hidden>🌳</div><div className="absolute left-1/2 -translate-x-1/2 -top-16 font-bold text-[18px] text-[var(--eve)]">?</div></div>
+        <div className="channel">{busy && <span className="fly" />}<div className="absolute left-1/2 -translate-x-1/2 -top-12 text-[var(--good)]" aria-hidden><Icon name="tree" size={42} strokeWidth={2.2} /></div><div className="absolute left-1/2 -translate-x-1/2 -top-16 font-bold text-[18px] text-[var(--eve)]">?</div></div>
         <Avatar who="bob" size={64} />
       </div>
       <p className="text-[13px] mt-8">Is Eve hiding behind the tree? You can't see her. You can only look at the numbers.</p>
@@ -403,7 +409,7 @@ function Mission3({ head, tablet, onDone, onNext, onReplay }) {
       {rule}
       {phase === 'reveal' && (
         <div className={`note pop font-bold ${answer === spyEvidence ? 'good' : 'bad'}`}>
-          {answer === spyEvidence ? '✓ Good detective work!' : `✗ Not quite: ${pct}% different means ${spyEvidence ? 'a spy was there' : 'no sign of a spy'}.`}
+          {answer === spyEvidence ? <><Icon name="check" size={18} /> Good detective work!</> : <><Icon name="x" size={18} /> Not quite: {pct}% different means {spyEvidence ? 'a spy was there' : 'no sign of a spy'}.</>}
         </div>
       )}
       <div className="mt-auto pt-2 flex flex-wrap gap-3 items-center">
@@ -412,12 +418,15 @@ function Mission3({ head, tablet, onDone, onNext, onReplay }) {
           <button className="pill" onClick={() => decide(true)}>A <span className="hl">spy</span> was here!</button>
           <button className="btn-ghost-dark" onClick={() => decide(false)}>No spy</button>
         </>)}
-        {phase === 'reveal' && <button className="pill" onClick={next}>{round === CASES - 1 ? <>See my <span className="hl">stars</span></> : <>Next <span className="hl">case</span> ›</>}</button>}
+        {phase === 'reveal' && <button className="pill" onClick={next}>{round === CASES - 1 ? <>See my <span className="hl">stars</span></> : <>Next <span className="hl">case</span> <Icon name="right" size={18} strokeWidth={2.6} /></>}</button>}
         {phase === 'done' && <DoneButtons onNext={onNext} onReplay={onReplay} />}
       </div>
     </>)
     screen = phase === 'done'
-      ? <div className="screen-pad"><Celebrate stars={stars} title="Spy hunter">You solved {right} of {CASES} cases. Eve can't hide: when she peeks, about <b>1 in 4</b> checked numbers comes out wrong, far more than the 1-in-10 detective rule.</Celebrate></div>
+      ? <div className="screen-pad">
+        <Celebrate stars={stars} title="Spy hunter">You solved {right} of {CASES} cases. A greedy Eve can't hide: when she peeks at every photon, about <b>1 in 4</b> checked numbers comes out wrong, far more than the 1-in-10 detective rule. But a <b>clever</b> Eve who peeks at fewer photons can hide under the line.</Celebrate>
+        <TryLab text={<>Can you catch a <b>clever Eve</b>? She's waiting in the <b>Spy Lab</b>.</>} onClick={() => onLab('eve')} />
+      </div>
       : (
         <div className="screen-pad">
           <h3 className="text-center">Checked numbers: Alice vs Bob</h3>
@@ -535,7 +544,7 @@ function Mission4({ head, tablet, onDone, onNext, onReplay }) {
         {phase === 'lock' && <button className="pill" onClick={() => setPhase('eve')}>Send it to <span className="hl">Bob</span></button>}
         {phase === 'eve' && <button className="pill" onClick={() => setPhase('unlock')}>Bob, <span className="hl">unlock it!</span></button>}
         {phase === 'unlock' && <button className="pill" onClick={() => { onDone(3); setPhase('done') }}>Finish <span className="hl">mission</span></button>}
-        {phase === 'done' && <DoneButtons onNext={onNext} onReplay={onReplay} nextLabel={<>Take the <span className="hl">Boss Quiz</span> ›</>} />}
+        {phase === 'done' && <DoneButtons onNext={onNext} onReplay={onReplay} nextLabel={<>Take the <span className="hl">Boss Quiz</span> <Icon name="right" size={18} strokeWidth={2.6} /></>} />}
       </div>
     </>)
     screen = phase === 'done'
@@ -553,15 +562,15 @@ function Mission4({ head, tablet, onDone, onNext, onReplay }) {
 
 const COMPONENTS = [Mission1, Mission2, Mission3, Mission4]
 
-export function Missions({ mission, setMission, stars, setStar, unlocked, totalStars, onQuiz }) {
+export function Missions({ mission, setMission, stars, setStar, totalStars, onQuiz, onLab }) {
   const [attempt, setAttempt] = useState(0)
   const C = COMPONENTS[mission]
   const id = MISSIONS[mission].id
-  const head = <MissionHead index={mission} stars={stars} unlocked={unlocked} setMission={(i) => { setMission(i); setAttempt((a) => a + 1) }} />
+  const head = <MissionHead index={mission} />
   const tablet = (status) => <MissionTablet index={mission} best={stars[id] || 0} total={totalStars} status={status} />
   const onNext = mission < MISSIONS.length - 1 ? () => { setMission(mission + 1); setAttempt((a) => a + 1) } : onQuiz
   return (
     <C key={`${mission}-${attempt}`} head={head} tablet={tablet} onDone={(n) => setStar(id, n)} onNext={onNext}
-      onReplay={() => setAttempt((a) => a + 1)} />
+      onReplay={() => setAttempt((a) => a + 1)} onLab={onLab} />
   )
 }

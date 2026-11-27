@@ -1,3 +1,4 @@
+import { Icon } from './Icons.jsx'
 import { Bubble, Celebrate } from './Characters.jsx'
 
 export const QUESTIONS = [
@@ -49,7 +50,7 @@ export function QuizScreen({ quiz, setQuiz }) {
             <li key={i}>
               {q.q}{' '}
               <span className={answers[i] === q.answer ? 'text-[var(--good)] font-bold' : 'text-[var(--bad)]'}>
-                {answers[i] === q.answer ? '✓' : `✗ Answer: ${q.options[q.answer]}`}
+                {answers[i] === q.answer ? <Icon name="check" size={18} title="Right" /> : <><Icon name="x" size={18} title="Wrong" /> Answer: {q.options[q.answer]}</>}
               </span>
             </li>
           ))}
@@ -83,7 +84,7 @@ export function QuizScreen({ quiz, setQuiz }) {
   )
 }
 
-export function QuizLeft({ quiz, setQuiz, onFinish }) {
+export function QuizLeft({ quiz, setQuiz, onFinish, onLab }) {
   const { index, answers } = quiz
   const done = index >= QUESTIONS.length
   const score = QUESTIONS.filter((q, i) => answers[i] === q.answer).length
@@ -100,15 +101,18 @@ export function QuizLeft({ quiz, setQuiz, onFinish }) {
       <Bubble who="bob">Five questions about everything you learned. Pick an answer and I'll tell you if you're right, and why. Get all 5 for <b>3 stars</b>!</Bubble>
       <div className="flex gap-1.5" aria-label="Progress">
         {QUESTIONS.map((q, i) => (
-          <span key={i} className="h-3 flex-1 rounded-full" style={{ background: answers[i] == null ? '#E2E8F0' : answers[i] === q.answer ? '#16A34A' : '#DC2626' }} />
+          <span key={i} className="h-3 flex-1 rounded-full" style={{ background: answers[i] == null ? '#fff' : answers[i] === q.answer ? 'var(--good)' : 'var(--bad)', border: '2px solid var(--ink-strong)' }} />
         ))}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         {done ? (
-          <button className="pill" onClick={() => setQuiz({ index: 0, answers: {} })}>Play <span className="hl">again</span></button>
+          <>
+            <button className="pill" onClick={onLab}>Go to the <span className="hl">Lab</span> <Icon name="right" size={18} strokeWidth={2.6} /></button>
+            <button className="btn-ghost-dark" onClick={() => setQuiz({ index: 0, answers: {} })}>Play again</button>
+          </>
         ) : (
           <button className="pill" disabled={answers[index] == null} onClick={next}>
-            {index === QUESTIONS.length - 1 ? <>See my <span className="hl">stars</span></> : <>Next <span className="hl">question</span> ›</>}
+            {index === QUESTIONS.length - 1 ? <>See my <span className="hl">stars</span></> : <>Next <span className="hl">question</span> <Icon name="right" size={18} strokeWidth={2.6} /></>}
           </button>
         )}
       </div>

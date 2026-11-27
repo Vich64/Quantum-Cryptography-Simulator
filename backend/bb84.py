@@ -3,6 +3,7 @@
 Follows the project proposal (section 6.7): each photon is a one-qubit circuit.
   - Alice writes bit 1 with an X gate and switches to the x filter with an H gate.
   - Eve (optional) measures in a random filter, then re-sends a photon in her filter.
+  - Channel noise (optional) flips Bob's result with an X gate just before he measures.
   - Bob switches to the x filter with an H gate and measures.
 
 Filters (bases) are stored as 0 = "+" (straight) and 1 = "x" (diagonal).
@@ -10,6 +11,7 @@ Filters (bases) are stored as 0 = "+" (straight) and 1 = "x" (diagonal).
 
 from __future__ import annotations
 
+import math
 import secrets
 
 import numpy as np
@@ -30,8 +32,14 @@ SLIDE12_EXAMPLE = {
 }
 
 
-def photon_circuit(alice_bit: int, alice_basis: int, bob_basis: int, eve_basis: int | None = None) -> QuantumCircuit:
-    """Build the circuit for one photon. Classical bit 0 = Bob's result, bit 1 = Eve's result."""
+def photon_circuit(
+    alice_bit: int, alice_basis: int, bob_basis: int, eve_basis: int | None = None, noise_flip: bool = False
+) -> QuantumCircuit:
+    """Build the circuit for one photon. Classical bit 0 = Bob's result, bit 1 = Eve's result.
+
+    noise_flip: the channel/detector flips Bob's result (a Pauli X applied after Bob's filter,
+    so it flips the bit in either filter). Alice and Bob cannot tell this apart from Eve.
+    """
     qc = QuantumCircuit(1, 2, name="photon")
     # 1. Alice prepares the photon
     if alice_bit:
@@ -50,6 +58,8 @@ def photon_circuit(alice_bit: int, alice_basis: int, bob_basis: int, eve_basis: 
     # 3. Bob reads with his filter
     if bob_basis:
         qc.h(0)
+    if noise_flip:
+        qc.x(0)
     qc.measure(0, 0)
     return qc
 
@@ -63,10 +73,22 @@ def _validate_bits(name: str, values, n: int) -> list[int]:
     return out
 
 
+def wilson_interval(errors: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """Rough 95 % range for an error rate measured from n checked bits (Wilson score interval)."""
+    if n == 0:
+        return (0.0, 1.0)
+    q = errors / n
+    denom = 1 + z * z / n
+    centre = (q + z * z / (2 * n)) / denom
+    half = z * math.sqrt(q * (1 - q) / n + z * z / (4 * n * n)) / denom
+    return (max(0.0, centre - half), min(1.0, centre + half))
+
+
 def run_bb84(
     n_photons: int,
     eve_fraction: float = 0.0,
     check_fraction: float = 0.25,
+    noise_fraction: float = 0.0,
     seed: int | None = None,
     alice_bits=None,
     alice_bases=None,
@@ -77,6 +99,7 @@ def run_bb84(
     eve_fraction:   share of photons Eve reads (0 = no Eve, 1 = every photon).
     check_fraction: share of the kept bits Alice and Bob reveal publicly to estimate errors.
                     Those bits are thrown away; the rest become the key.
+    noise_fraction: chance that the channel flips Bob's result on any photon (bit-flip noise).
     """
     if n_photons < 1:
         raise ValueError("n_photons must be at least 1")
@@ -84,6 +107,8 @@ def run_bb84(
         raise ValueError("eve_fraction must be between 0 and 1")
     if not 0.0 <= check_fraction <= 1.0:
         raise ValueError("check_fraction must be between 0 and 1")
+    if not 0.0 <= noise_fraction <= 0.5:
+        raise ValueError("noise_fraction must be between 0 and 0.5")
 
     seed = secrets.randbelow(2**31 - 1) if seed is None else int(seed)
     rng = np.random.default_rng(seed)
@@ -99,8 +124,12 @@ def run_bb84(
     eve_set = set(rng.choice(n, size=n_eve, replace=False).tolist()) if n_eve else set()
     e_bases = [int(rng.integers(0, 2)) if i in eve_set else None for i in range(n)]
 
+    # Channel noise: each photon's result is flipped with probability noise_fraction.
+    # (Only drawn when noise is on, so noise-free runs give exactly the same results as before.)
+    flips = (rng.random(n) < noise_fraction).tolist() if noise_fraction > 0 else [False] * n
+
     # Run every photon on Qiskit Aer, one shot each
-    circuits = [photon_circuit(a_bits[i], a_bases[i], b_bases[i], e_bases[i]) for i in range(n)]
+    circuits = [photon_circuit(a_bits[i], a_bases[i], b_bases[i], e_bases[i], flips[i]) for i in range(n)]
     result = _SIM.run(circuits, shots=1, memory=True, seed_simulator=seed).result()
     outcomes = [result.get_memory(i)[0] for i in range(n)]  # e.g. "01" -> clbit1 clbit0
     b_bits = [int(s[-1]) for s in outcomes]
@@ -125,6 +154,21 @@ def run_bb84(
 
     estimated_qber = len(errors_check) / n_check if n_check else None
     actual_qber = len(errors_kept) / n_kept if n_kept else None
+    # Each photon Eve reads gives a 1/4 chance of an error, so errors ~ f/4  =>  f ~ 4 * errors.
+    # (Alice and Bob cannot tell noise from Eve, so noise makes this guess too high.)
+    estimated_eve_fraction = min(1.0, 4 * estimated_qber) if estimated_qber is not None else None
+    if n_check:
+        lo, hi = wilson_interval(len(errors_check), n_check)
+        estimated_eve_range = [min(1.0, 4 * lo), min(1.0, 4 * hi)]
+    else:
+        estimated_eve_range = None
+
+    # What Eve learned about the final key: her copy of a key bit equals Alice's bit.
+    # On photons where she used the right glasses she is sure; on the others she got it by luck.
+    eve_key_read = [i for i in key_idx if e_bases[i] is not None]
+    eve_known = [i for i in eve_key_read if e_bits[i] == a_bits[i]]
+    eve_sure = [i for i in eve_key_read if e_bases[i] == a_bases[i]]
+
     if n_check == 0:
         status = "too_short"
     elif estimated_qber <= QBER_LIMIT:
@@ -150,7 +194,10 @@ def run_bb84(
                 "same_filter": a_bases[i] == b_bases[i],
                 "is_check": i in check_set,
                 "in_key": i in key_idx,
+                "noise_flip": bool(flips[i]),
                 "error": a_bits[i] != b_bits[i] and a_bases[i] == b_bases[i],
+                # Eve touched this kept photon and it shows up as a mistake (checked or not)
+                "eve_caught": eb is not None and a_bases[i] == b_bases[i] and a_bits[i] != b_bits[i],
             }
         )
 
@@ -160,6 +207,7 @@ def run_bb84(
         "eve_fraction": eve_fraction,
         "eve_count": n_eve,
         "check_fraction": check_fraction,
+        "noise_fraction": noise_fraction,
         "photons": photons,
         "kept_count": n_kept,
         "keep_rate": n_kept / n,
@@ -168,6 +216,11 @@ def run_bb84(
         "kept_errors": len(errors_kept),
         "estimated_qber": estimated_qber,
         "actual_qber": actual_qber,
+        "estimated_eve_fraction": estimated_eve_fraction,
+        "estimated_eve_range": estimated_eve_range,
+        "eve_key_bits_read": len(eve_key_read),
+        "eve_known_key_bits": len(eve_known),
+        "eve_sure_key_bits": len(eve_sure),
         "qber_limit": QBER_LIMIT,
         "status": status,
         "sifted_key": [a_bits[i] for i in kept],
@@ -177,22 +230,28 @@ def run_bb84(
     }
 
 
-def run_sweep(n_photons: int = 400, steps: int = 11, seed: int | None = None) -> dict:
+def expected_qber(eve_fraction: float, noise_fraction: float = 0.0) -> float:
+    """Theory: Eve makes an error on 1/4 of the photons she reads; noise then flips a share p of all results."""
+    e = 0.25 * eve_fraction
+    return e * (1 - noise_fraction) + (1 - e) * noise_fraction
+
+
+def run_sweep(n_photons: int = 400, steps: int = 11, seed: int | None = None, noise_fraction: float = 0.0) -> dict:
     """Error rate in the kept bits as Eve reads 0 % -> 100 % of photons."""
     seed = secrets.randbelow(2**31 - 1) if seed is None else int(seed)
     points = []
     for k in range(steps):
         f = k / (steps - 1)
-        r = run_bb84(n_photons, eve_fraction=f, check_fraction=0.0, seed=seed + k)
+        r = run_bb84(n_photons, eve_fraction=f, check_fraction=0.0, seed=seed + k, noise_fraction=noise_fraction)
         points.append(
             {
                 "eve_percent": round(f * 100),
                 "measured": r["actual_qber"],
-                "theory": 0.25 * f,
+                "theory": expected_qber(f, noise_fraction),
                 "keep_rate": r["keep_rate"],
             }
         )
-    return {"seed": seed, "n_photons": n_photons, "qber_limit": QBER_LIMIT, "points": points}
+    return {"seed": seed, "n_photons": n_photons, "noise_fraction": noise_fraction, "qber_limit": QBER_LIMIT, "points": points}
 
 
 def measure_once(alice_bit: int, alice_basis: int, bob_basis: int) -> int:
